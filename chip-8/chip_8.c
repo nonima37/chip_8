@@ -1,5 +1,11 @@
+//
 // ToDo
+// draw_pixel doesn't work...
 // implement bit turn off/on system somehow 
+// 
+// ToDocument
+// draw_shape function 
+//
 #include <stdio.h>
 #include <stdbool.h>
 #include <SDL.h>
@@ -25,18 +31,20 @@ bool* byte_to_bits(BYTE byte) {
 
 void draw_pixel(int start_x, int start_y) {
 	int index;
-	for (int y = start_y; y < start_y+30; y++) {
-		for (int x = start_x; x < start_x+30; x++) {
+	for (int y = start_y*PIXEL_SIZE; y < start_y+PIXEL_SIZE; y++) {
+		for (int x = start_x*PIXEL_SIZE; x < start_x+PIXEL_SIZE; x++) {
 			index = x+y*WINDOW_WIDTH;
 			*(pixels+index) = 255;
 		}
 	}
 }
 
-void draw_shape(BYTE* first_byte, int start_x, int start_y, SDL_Renderer *renderer, int num_of_bytes) {
+// How does this work?
+void draw_shape(BYTE* first_byte, int start_x, int start_y, int num_of_bytes, SDL_Renderer *renderer) {
 	bool sprite[num_of_bytes];
 	bool* cur_bits;
 
+	// Making sprite array
 	for (int i = 0; i < num_of_bytes/8; i++) {
 		cur_bits = byte_to_bits(*(first_byte+i));
 		for (int j = 0; j < 8; j++) {
@@ -44,6 +52,7 @@ void draw_shape(BYTE* first_byte, int start_x, int start_y, SDL_Renderer *render
 		}
 	}
 
+	// Drawing that sprite
 	for (int i = 0; i < num_of_bytes; i++) {
 		if (sprite[i]) {
 			for (int y = start_y; y < start_y+PIXEL_SIZE; y++) {
@@ -89,9 +98,12 @@ int main(int argc, char* args[]) {
 		0xE0, 0x90, 0x90, 0x90, 0xE0,
 		0xF0, 0x80, 0xF0, 0x80, 0xF0,
 		0xF0, 0x80, 0xF0, 0x80, 0x80,
-		// Instructions
+		// Instructions:
 		// Opcodes are 2 bytes, 2 hex digits = 1 byte
 		// First byte for the instruction and the second one for the value (I think)
+		// This is an 8-bit microprocessor so it can only process 8 bits at a time.
+		// Which is just one elemnt in this array...
+		0xAA, 0xE0, // Clear screen
 		0xA0, 0x0F, // Set index register to value F 
 		// Is index register the same things as program counter???
 		// No, I think it just points to a memory location??
@@ -100,10 +112,7 @@ int main(int argc, char* args[]) {
 	struct Types current_counter = {program_counter:80};
 	signed int index_register = 0;
 
-	draw_pixel(100, 100);
-	SDL_UpdateTexture(texture, NULL, pixels, WINDOW_WIDTH);
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
-	SDL_RenderPresent(renderer);
+	draw_pixel(4,4);
 
 	int cur_instruction;
 	int cur_value;
@@ -112,22 +121,33 @@ int main(int argc, char* args[]) {
 		if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
 			break;
 
+		SDL_UpdateTexture(texture, NULL, pixels, WINDOW_WIDTH);
+		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		SDL_RenderPresent(renderer);
+
 		cur_instruction = memory[current_counter.program_counter];
-		cur_value = memory[current_counter.program_counter+1];
-		// I don't remember why I did this so I'll just ignore it for now
-		// cur_instruction = (cur_instruction>>4);
 
 		switch (cur_instruction) {
+			case 0x00:
+				cur_instruction = memory[current_counter.program_counter+1];
+				switch(cur_instruction) {
+					case 0xE0:
+						for (int i = 0; i < WINDOW_HEIGHT*WINDOW_WIDTH*PIXEL_SIZE; i++) {
+							pixels[i] = 0;
+						}
+						printf("Cleared screen");
+				}
+				break;
 			case 0xA0:
 				index_register = cur_value;
-				printf("Setting index register to: %d", memory[current_counter.program_counter+1]);
-				printf("Index register value: %d\n", index_register);
+				printf("Setting index register to: %d\n", memory[current_counter.program_counter+1]);
 				break;
+
 			default:
 				break;
 		}
 		if (current_counter.program_counter < 200) {
-			current_counter.program_counter++;
+			current_counter.program_counter += 2;
 		}
 	}
 
